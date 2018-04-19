@@ -1,0 +1,94 @@
+version: "2"
+volumes:
+  pgdb:
+services:
+  base:
+    build:
+      context: .
+    image: local/bec_alerts
+
+  processor:
+    image: local/bec_alerts
+    depends_on:
+      - localstack
+    volumes:
+      - .:/app
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=asdf
+      - AWS_DEFAULT_REGION=us-west-2
+      - SQS_ENDPOINT_URL=http://localstack:6000
+      - SES_ENDPOINT_URL=http://localstack:6001
+      - SES_VERIFY_EMAIL=True
+      - AWS_CONNECT_TIMEOUT=3
+      - AWS_READ_TIMEOUT=3
+    command: ["bec-alerts", "processor"]
+
+  # -----------------------------
+  # External services
+  # -----------------------------
+
+  # https://hub.docker.com/r/localstack/localstack/
+  # localstack running a fake SQS
+  localstack:
+    image: localstack/localstack
+    environment:
+      - SERVICES=sqs:6000,ses:6001
+      - DEFAULT_REGION=us-west-2
+      - HOSTNAME=localstack
+      - DEBUG=1
+    ports:
+      - "6000:6000"
+
+  redis:
+    image: redis
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_USER: sentry
+      POSTGRES_PASSWORD: sentry
+      POSTGRES_DB: sentry
+    volumes:
+     - pgdb:/var/lib/postgresql/data
+
+  sentry:
+    build: ./sentry
+    links:
+     - redis
+     - postgres
+     - localstack
+    ports:
+     - 9000:9000
+    environment:
+      SENTRY_SECRET_KEY: '!!!SECRET!!!'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: sentry
+      SENTRY_DB_PASSWORD: sentry
+      SENTRY_REDIS_HOST: redis
+
+  cron:
+    build: ./sentry
+    links:
+     - redis
+     - postgres
+    command: "sentry run cron"
+    environment:
+      SENTRY_SECRET_KEY: '!!!SECRET!!!'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: sentry
+      SENTRY_DB_PASSWORD: sentry
+      SENTRY_REDIS_HOST: redis
+
+  worker:
+    build: ./sentry
+    links:
+     - redis
+     - postgres
+    command: "sentry run worker"
+    environment:
+      SENTRY_SECRET_KEY: '!!!SECRET!!!'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: sentry
+      SENTRY_DB_PASSWORD: sentry
+      SENTRY_REDIS_HOST: redis
