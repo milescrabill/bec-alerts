@@ -2,7 +2,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import click
+import os
 import time
+from multiprocessing import Process
 
 from django.utils import timezone
 
@@ -23,16 +25,7 @@ def process_event(event):
         issue.save()
 
 
-@click.command()
-@click.option('--sleep-delay', default=20, envvar='PROCESSOR_SLEEP_DELAY')
-@click.option('--queue-name', default='sentry_errors', envvar='SQS_QUEUE_NAME')
-@click.option('--key-id', prompt=True, envvar='AWS_ACCESS_KEY_ID')
-@click.option('--access-key', prompt=True, hide_input=True, envvar='AWS_SECRET_ACCESS_KEY')
-@click.option('--region', prompt=True, envvar='AWS_DEFAULT_REGION')
-@click.option('--endpoint-url', envvar='SQS_ENDPOINT_URL')
-@click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
-@click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
-def main(
+def listen(
     sleep_delay,
     queue_name,
     key_id,
@@ -42,7 +35,6 @@ def main(
     connect_timeout,
     read_timeout,
 ):
-    print('Starting processor')
     queue_backend = SQSQueueBackend(
         queue_name=queue_name,
         key_id=key_id,
@@ -62,3 +54,41 @@ def main(
         except Exception as err:
             print(f'Error receiving message: {err}')
             time.sleep(sleep_delay)
+
+
+@click.command()
+@click.option('--sleep-delay', default=20, envvar='PROCESSOR_SLEEP_DELAY')
+@click.option('--queue-name', default='sentry_errors', envvar='SQS_QUEUE_NAME')
+@click.option('--key-id', prompt=True, envvar='AWS_ACCESS_KEY_ID')
+@click.option('--access-key', prompt=True, hide_input=True, envvar='AWS_SECRET_ACCESS_KEY')
+@click.option('--region', prompt=True, envvar='AWS_DEFAULT_REGION')
+@click.option('--endpoint-url', envvar='SQS_ENDPOINT_URL')
+@click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
+@click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
+@click.option('--process_count', default=os.cpu_count(), envvar='PROCESSOR_PROCESS_COUNT')
+def main(
+    sleep_delay,
+    queue_name,
+    key_id,
+    access_key,
+    region,
+    endpoint_url,
+    connect_timeout,
+    read_timeout,
+    process_count,
+):
+    print('Starting processor workers')
+    processes = []
+    for k in range(process_count):
+        process = Process(target=listen, kwargs={
+            'sleep_delay': sleep_delay,
+            'queue_name': queue_name,
+            'key_id': key_id,
+            'access_key': access_key,
+            'region': region,
+            'endpoint_url': endpoint_url,
+            'connect_timeout': connect_timeout,
+            'read_timeout': read_timeout,
+        })
+        process.start()
+        processes.append(process)

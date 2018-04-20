@@ -22,6 +22,7 @@ services:
       - SES_VERIFY_EMAIL=True
       - AWS_CONNECT_TIMEOUT=3
       - AWS_READ_TIMEOUT=3
+      - PROCESSOR_PROCESS_COUNT=2
     command: ["bec-alerts", "processor"]
 
   # -----------------------------

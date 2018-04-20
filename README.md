@@ -83,6 +83,7 @@ The following environment variables are available:
 | `SQS_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
+| `PROCESSOR_PROCESS_COUNT` | :x: | System CPU count | Number of worker processes to start |
 
 ### Watcher
 
