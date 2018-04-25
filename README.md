@@ -84,6 +84,7 @@ The following environment variables are available:
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 | `PROCESSOR_PROCESS_COUNT` | :x: | System CPU count | Number of worker processes to start |
+| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 
 ### Watcher
 
@@ -104,6 +105,7 @@ The following environment variables are available:
 | `SES_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
+| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 
 ## License
 

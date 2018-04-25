@@ -1,16 +1,15 @@
 version: "2"
 volumes:
-  pgdb:
+  sentry-pgdb:
+  processor-pgdb:
 services:
-  base:
+  processor:
     build:
       context: .
     image: local/bec_alerts
-
-  processor:
-    image: local/bec_alerts
-    depends_on:
+    links:
       - localstack
+      - processor-postgres
     volumes:
       - .:/app
     environment:
@@ -23,6 +22,7 @@ services:
       - AWS_CONNECT_TIMEOUT=3
       - AWS_READ_TIMEOUT=3
       - PROCESSOR_PROCESS_COUNT=2
+      - DATABASE_URL=postgres://processor:processor@processor-postgres/processor
     command: ["bec-alerts", "processor"]
 
   # -----------------------------
@@ -39,44 +39,57 @@ services:
       - HOSTNAME=localstack
       - DEBUG=1
     ports:
-      - "6000:6000"
+      - 6000:6000
+      - 6001:6001
 
   redis:
     image: redis
 
-  postgres:
+  processor-postgres:
+    image: postgres
+    ports:
+      - 8574:5432
+    environment:
+      POSTGRES_USER: processor
+      POSTGRES_PASSWORD: processor
+      POSTGRES_DB: processor
+    volumes:
+     - processor-pgdb:/var/lib/postgresql/data
+
+  sentry:
+    build: ./sentry
+    links:
+     - redis
+     - sentry-postgres
+     - localstack
+    ports:
+     - 9000:9000
+    environment:
+      SENTRY_SECRET_KEY: '!!!SECRET!!!'
+      SENTRY_POSTGRES_HOST: sentry-postgres
+      SENTRY_DB_USER: sentry
+      SENTRY_DB_PASSWORD: sentry
+      SENTRY_REDIS_HOST: redis
+
+  sentry-postgres:
     image: postgres
     environment:
       POSTGRES_USER: sentry
       POSTGRES_PASSWORD: sentry
       POSTGRES_DB: sentry
     volumes:
-     - pgdb:/var/lib/postgresql/data
+     - sentry-pgdb:/var/lib/postgresql/data
 
-  sentry:
-    build: ./sentry
-    links:
-     - redis
-     - postgres
-     - localstack
-    ports:
-     - 9000:9000
-    environment:
-      SENTRY_SECRET_KEY: '!!!SECRET!!!'
-      SENTRY_POSTGRES_HOST: postgres
-      SENTRY_DB_USER: sentry
-      SENTRY_DB_PASSWORD: sentry
-      SENTRY_REDIS_HOST: redis
 
   cron:
     build: ./sentry
     links:
      - redis
-     - postgres
+     - sentry-postgres
     command: "sentry run cron"
     environment:
       SENTRY_SECRET_KEY: '!!!SECRET!!!'
-      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_POSTGRES_HOST: sentry-postgres
       SENTRY_DB_USER: sentry
       SENTRY_DB_PASSWORD: sentry
       SENTRY_REDIS_HOST: redis
@@ -85,11 +98,11 @@ services:
     build: ./sentry
     links:
      - redis
-     - postgres
+     - sentry-postgres
     command: "sentry run worker"
     environment:
       SENTRY_SECRET_KEY: '!!!SECRET!!!'
-      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_POSTGRES_HOST: sentry-postgres
       SENTRY_DB_USER: sentry
       SENTRY_DB_PASSWORD: sentry
       SENTRY_REDIS_HOST: redis
