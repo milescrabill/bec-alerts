@@ -61,7 +61,8 @@ The service consists of a few AWS services and a Docker image that is intended t
 
 - An SQS queue (named `sentry_errors` by default) that Sentry can write to and the app can read from. The app will create the queue on startup itself.
 - An SES account for sending email notifications
-- An RDS resource running a Postgres database for storing aggregation data
+- An RDS resource running a Postgres 10 database for storing aggregation data
+  - Postgres is expected to have the `postgresql-hll` extension installed and enabled.
 
 The Docker image defined in `Dockerfile` is used to run two separate processes:
 

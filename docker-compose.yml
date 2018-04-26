@@ -4,9 +4,7 @@ volumes:
   processor-pgdb:
 services:
   processor:
-    build:
-      context: .
-    image: local/bec_alerts
+    build: .
     links:
       - localstack
       - processor-postgres
@@ -46,7 +44,7 @@ services:
     image: redis
 
   processor-postgres:
-    image: postgres
+    build: ./postgres
     ports:
       - 8574:5432
     environment:

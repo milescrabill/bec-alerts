@@ -4,11 +4,13 @@
 import click
 import os
 import time
+import traceback
+from datetime import datetime
 from multiprocessing import Process
 
 from django.utils import timezone
 
-from bec_alerts.models import Issue
+from bec_alerts.models import Issue, IssueBucket
 from bec_alerts.queue_backends import SQSQueueBackend
 
 
@@ -16,13 +18,23 @@ def process_event(event):
     # Fingerprints are actually an array of values, but we only use the
     # default fingerprint algorithm, which uses a single value.
     fingerprint = event['fingerprints'][0]
-    issue, created = Issue.objects.get_or_create(fingerprint=fingerprint, defaults={
-        'last_seen': timezone.now(),
-    })
+    naive_datetime_received = datetime.strptime(event['dateReceived'], '%Y-%m-%dT%H:%M:%S.%fZ')
+    datetime_received = timezone.make_aware(naive_datetime_received, timezone=timezone.utc)
 
-    if not created:
-        issue.last_seen = timezone.now()
+    # Create issue, or update the last_seen date for it
+    issue, created = Issue.objects.get_or_create(fingerprint=fingerprint, defaults={
+        'last_seen': datetime_received,
+    })
+    if not created and issue.last_seen < datetime_received:
+        issue.last_seen = datetime_received
         issue.save()
+
+    # Increment the event count bucket
+    bucket, created = IssueBucket.objects.get_or_create(
+        issue=issue,
+        date=datetime_received.date(),
+    )
+    bucket.count_event(event['eventID'])
 
 
 def listen(
@@ -50,7 +62,11 @@ def listen(
         try:
             for event in queue_backend.receive_events():
                 print(f'Received event: {event["eventID"]}')
-                process_event(event)
+                try:
+                    process_event(event)
+                except Exception as err:
+                    print(f'Error processing event: {event["eventID"]}')
+                    traceback.print_exc()
         except Exception as err:
             print(f'Error receiving message: {err}')
             time.sleep(sleep_delay)
