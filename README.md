@@ -78,14 +78,16 @@ The following environment variables are available:
 
 | Name | Required? | Default | Description |
 | ---- | --------- | ------- | ----------- |
+| `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
+| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+| `DJANGO_SECRET_KEY` | :white_check_mark: | | Secret key for Django's cryptographic signing. We don't really use it but Django fails to start without it. Set to a secret, random string. |
 | `PROCESSOR_SLEEP_DELAY` | :x: | `20` | Seconds to wait between polling the queue |
 | `SQS_QUEUE_NAME` | :x: | `sentry_errors` | Name of the queue to poll for events. |
-| `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
 | `SQS_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 | `PROCESSOR_PROCESS_COUNT` | :x: | System CPU count | Number of worker processes to start |
-| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+
 
 ### Watcher
 

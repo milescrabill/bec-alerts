@@ -11,16 +11,17 @@ services:
     volumes:
       - .:/app
     environment:
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=asdf
-      - AWS_DEFAULT_REGION=us-west-2
-      - SQS_ENDPOINT_URL=http://localstack:6000
-      - SES_ENDPOINT_URL=http://localstack:6001
-      - SES_VERIFY_EMAIL=True
-      - AWS_CONNECT_TIMEOUT=3
-      - AWS_READ_TIMEOUT=3
-      - PROCESSOR_PROCESS_COUNT=2
-      - DATABASE_URL=postgres://processor:processor@processor-postgres/processor
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: asdf
+      AWS_DEFAULT_REGION: us-west-2
+      SQS_ENDPOINT_URL: http://localstack:6000
+      SES_ENDPOINT_URL: http://localstack:6001
+      SES_VERIFY_EMAIL: 'True'
+      AWS_CONNECT_TIMEOUT: 3
+      AWS_READ_TIMEOUT: 3
+      PROCESSOR_PROCESS_COUNT: 2
+      DATABASE_URL: postgres://processor:processor@processor-postgres/processor
+      DJANGO_SECRET_KEY: '!!!SECRET!!!'
     command: ["bec-alerts", "processor"]
 
   # -----------------------------
