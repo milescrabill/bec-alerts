@@ -38,9 +38,6 @@ def process_triggers(alert_backend):
 def run_job(
     dry_run,
     from_email,
-    key_id,
-    access_key,
-    region,
     endpoint_url,
     connect_timeout,
     read_timeout,
@@ -55,9 +52,6 @@ def run_job(
 
         alert_backend = EmailAlertBackend(
             from_email=from_email,
-            key_id=key_id,
-            access_key=access_key,
-            region=region,
             endpoint_url=endpoint_url,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
@@ -72,17 +66,6 @@ def run_job(
         TriggerRun.objects.filter(ran_at__lte=current_run.ran_at - timedelta(days=7)).delete()
 
 
-def validate_optional_for_dry_run(ctx, param, value):
-    if not value and not ctx.params['dry_run']:
-        raise click.BadParameter('Option is required unless --dry-run option is passed')
-    return value
-
-
-def wet_run_option(*args, **kwargs):
-    kwargs.setdefault('callback', validate_optional_for_dry_run)
-    return click.option(*args, **kwargs)
-
-
 @click.command()
 @click.option('--once', is_flag=True, default=False)
 @click.option('--dry-run', is_flag=True, default=False, is_eager=True)
@@ -92,17 +75,11 @@ def wet_run_option(*args, **kwargs):
 @click.option('--endpoint-url', envvar='SES_ENDPOINT_URL')
 @click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
-@wet_run_option('--key-id', prompt=True, envvar='AWS_ACCESS_KEY_ID')
-@wet_run_option('--access-key', prompt=True, hide_input=True, envvar='AWS_SECRET_ACCESS_KEY')
-@wet_run_option('--region', prompt=True, envvar='AWS_DEFAULT_REGION')
 def main(
     once,
     dry_run,
     sleep_delay,
     from_email,
-    key_id,
-    access_key,
-    region,
     endpoint_url,
     connect_timeout,
     read_timeout,
@@ -113,9 +90,6 @@ def main(
             run_job(
                 dry_run=dry_run,
                 from_email=from_email,
-                key_id=key_id,
-                access_key=access_key,
-                region=region,
                 endpoint_url=endpoint_url,
                 connect_timeout=connect_timeout,
                 read_timeout=read_timeout,

@@ -18,9 +18,6 @@ class SQSQueueBackend(QueueBackend):
     def __init__(
         self,
         queue_name,
-        key_id,
-        access_key,
-        region,
         endpoint_url,
         connect_timeout,
         read_timeout,
@@ -34,9 +31,6 @@ class SQSQueueBackend(QueueBackend):
         self.sqs = boto3.client(
             'sqs',
             config=config,
-            aws_access_key_id=key_id,
-            aws_secret_access_key=access_key,
-            region_name=region,
             endpoint_url=endpoint_url,
         )
 

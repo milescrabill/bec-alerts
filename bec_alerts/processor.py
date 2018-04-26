@@ -40,18 +40,12 @@ def process_event(event):
 def listen(
     sleep_delay,
     queue_name,
-    key_id,
-    access_key,
-    region,
     endpoint_url,
     connect_timeout,
     read_timeout,
 ):
     queue_backend = SQSQueueBackend(
         queue_name=queue_name,
-        key_id=key_id,
-        access_key=access_key,
-        region=region,
         endpoint_url=endpoint_url,
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
@@ -75,9 +69,6 @@ def listen(
 @click.command()
 @click.option('--sleep-delay', default=20, envvar='PROCESSOR_SLEEP_DELAY')
 @click.option('--queue-name', default='sentry_errors', envvar='SQS_QUEUE_NAME')
-@click.option('--key-id', prompt=True, envvar='AWS_ACCESS_KEY_ID')
-@click.option('--access-key', prompt=True, hide_input=True, envvar='AWS_SECRET_ACCESS_KEY')
-@click.option('--region', prompt=True, envvar='AWS_DEFAULT_REGION')
 @click.option('--endpoint-url', envvar='SQS_ENDPOINT_URL')
 @click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
@@ -85,9 +76,6 @@ def listen(
 def main(
     sleep_delay,
     queue_name,
-    key_id,
-    access_key,
-    region,
     endpoint_url,
     connect_timeout,
     read_timeout,
@@ -99,9 +87,6 @@ def main(
         process = Process(target=listen, kwargs={
             'sleep_delay': sleep_delay,
             'queue_name': queue_name,
-            'key_id': key_id,
-            'access_key': access_key,
-            'region': region,
             'endpoint_url': endpoint_url,
             'connect_timeout': connect_timeout,
             'read_timeout': read_timeout,

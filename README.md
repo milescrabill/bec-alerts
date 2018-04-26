@@ -64,6 +64,8 @@ The service consists of a few AWS services and a Docker image that is intended t
 - An RDS resource running a Postgres 10 database for storing aggregation data
   - Postgres is expected to have the `postgresql-hll` extension installed and enabled.
 
+AWS credentials are pulled from IAM. The region is provided by the `AWS_DEFAULT_REGION` environment variable.
+
 The Docker image defined in `Dockerfile` is used to run two separate processes:
 
 ### Processor
@@ -78,8 +80,6 @@ The following environment variables are available:
 | ---- | --------- | ------- | ----------- |
 | `PROCESSOR_SLEEP_DELAY` | :x: | `20` | Seconds to wait between polling the queue |
 | `SQS_QUEUE_NAME` | :x: | `sentry_errors` | Name of the queue to poll for events. |
-| `AWS_ACCESS_KEY_ID` | :white_check_mark: | | Access Key ID for connecting to AWS |
-| `AWS_SECRET_ACCESS_KEY` | :white_check_mark: | | Secret Access Key for connecting to AWS |
 | `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
 | `SQS_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
@@ -97,16 +97,15 @@ The following environment variables are available:
 
 | Name | Required? | Default | Description |
 | ---- | --------- | ------- | ----------- |
+| `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
+| `SES_FROM_EMAIL` | :white_check_mark: | `notifications@sentry.prod.mozaws.net` | Email to use in the From field for notifications |
+| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 | `SES_VERIFY_EMAIL` | :x: | `False` | If True, the watcher will attempt to verify the `SES_VERIFY_EMAIL` via API on startup. Should probably be False in production. |
 | `WATCHER_SLEEP_DELAY` | :x: | `300` | Seconds to wait between checking for new events and alert triggers |
-| `SES_FROM_EMAIL` | :white_check_mark: | `notifications@sentry.prod.mozaws.net` | Email to use in the From field for notifications |
-| `AWS_ACCESS_KEY_ID` | :white_check_mark: | | Access Key ID for connecting to AWS |
-| `AWS_SECRET_ACCESS_KEY` | :white_check_mark: | | Secret Access Key for connecting to AWS |
-| `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
 | `SES_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
-| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+
 
 ## License
 
