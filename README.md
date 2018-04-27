@@ -45,7 +45,17 @@ Prerequisites:
      SENTRY_DSN=http://really_long_hash@sentry:9000/2
      ```
 
-   __Important:__ You must change the `localhost` in the DSN to `sentry`, since it will be used in a Docker container where Sentry is not running on localhost.
+     __Important:__ You must change the `localhost` in the DSN to `sentry`, since it will be used in a Docker container where Sentry is not running on localhost.
+   - After copying the DSN, go to the project settings for the project you just created. Select the All Integrations subsection, and click the link to configure the "Amazon SQS Standalone" plugin.
+   - Enter the following config values:
+     - __Endpoint URL:__ http://localstack:6000
+     - __Queue URL:__ http://localstack:6000/queue/sentry_errors
+     - __Region:__ (Anything besides the default value)
+     - __Access Key:__ `asdf`
+     - __Secret Key:__ `asdf`
+   - Save the config and click the "Enable Plugin" button in the top right.
+
+   After configuring the plugin and enabling it, you should be able to submit errors to Sentry and see logging confirming that the processor received the post-processed events from Sentry.
 
 ### Simulating an Error
 
