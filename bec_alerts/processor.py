@@ -9,32 +9,78 @@ from datetime import datetime
 from multiprocessing import Process
 
 from django.utils import timezone
+from django.utils.functional import cached_property
 
 from bec_alerts.models import Issue, IssueBucket
 from bec_alerts.queue_backends import SQSQueueBackend
 
 
-def process_event(event):
-    # Fingerprints are actually an array of values, but we only use the
-    # default fingerprint algorithm, which uses a single value.
-    fingerprint = event['fingerprints'][0]
-    naive_datetime_received = datetime.strptime(event['dateReceived'], '%Y-%m-%dT%H:%M:%S.%fZ')
-    datetime_received = timezone.make_aware(naive_datetime_received, timezone=timezone.utc)
+class SentryEvent:
+    def __init__(self, data):
+        self.data = data
 
+        naive_datetime_received = datetime.strptime(data['dateReceived'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        self.datetime_received = timezone.make_aware(naive_datetime_received, timezone=timezone.utc)
+
+    @cached_property
+    def id(self):
+        return self.data['eventID']
+
+    @cached_property
+    def fingerprint(self):
+        """
+        Fingerprints are actually an array of values, but we only use
+        the default fingerprint algorithm, which uses a single value.
+        """
+        return self.data['fingerprints'][0]
+
+    def get_entry(self, entry_type):
+        for entry in self.data.get('entries', []):
+            if entry['type'] == entry_type:
+                return entry
+
+        return None
+
+    @cached_property
+    def exception(self):
+        try:
+            exception = self.get_entry('exception')
+
+            # Sometimes the data is in a values attribute? But not always.
+            data = exception['data']
+            if data.get('values', None):
+                data = data['values'][0]
+
+            return data
+        except KeyError:
+            return {}
+
+    @cached_property
+    def module(self):
+        return self.exception.get('module', '')
+
+    @cached_property
+    def stack_frames(self):
+        return self.exception.get('stacktrace', {}).get('frames', [])
+
+
+def process_event(event):
     # Create issue, or update the last_seen date for it
-    issue, created = Issue.objects.get_or_create(fingerprint=fingerprint, defaults={
-        'last_seen': datetime_received,
+    issue, created = Issue.objects.get_or_create(fingerprint=event.fingerprint, defaults={
+        'last_seen': event.datetime_received,
+        'module': event.module,
+        'stack_frames': event.stack_frames,
     })
-    if not created and issue.last_seen < datetime_received:
-        issue.last_seen = datetime_received
+    if not created and issue.last_seen < event.datetime_received:
+        issue.last_seen = event.datetime_received
         issue.save()
 
     # Increment the event count bucket
     bucket, created = IssueBucket.objects.get_or_create(
         issue=issue,
-        date=datetime_received.date(),
+        date=event.datetime_received.date(),
     )
-    bucket.count_event(event['eventID'])
+    bucket.count_event(event.id)
 
 
 def listen(
@@ -54,12 +100,13 @@ def listen(
     print('Waiting for an event...')
     while True:
         try:
-            for event in queue_backend.receive_events():
-                print(f'Received event: {event["eventID"]}')
+            for event_data in queue_backend.receive_events():
+                event = SentryEvent(event_data)
+                print(f'Received event: {event.id}')
                 try:
                     process_event(event)
                 except Exception as err:
-                    print(f'Error processing event: {event["eventID"]}')
+                    print(f'Error processing event: {event.id}')
                     traceback.print_exc()
         except Exception as err:
             print(f'Error receiving message: {err}')
