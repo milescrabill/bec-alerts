@@ -11,6 +11,7 @@ from django.utils import timezone
 from bec_alerts.alert_backends import ConsoleAlertBackend, EmailAlertBackend
 from bec_alerts.models import Issue, TriggerRun
 from bec_alerts.triggers import triggers
+from bec_alerts.utils import latest_nightly_appbuildid
 
 
 @transaction.atomic
@@ -20,6 +21,9 @@ def process_triggers(alert_backend):
         issues = Issue.objects.filter(last_seen__gte=last_finished_run.ran_at)
     else:
         issues = Issue.objects.all()
+
+    # Clear caches since we're starting a new run
+    latest_nightly_appbuildid.cache_clear()
 
     # Evaluate triggers
     triggered_issues = {}
