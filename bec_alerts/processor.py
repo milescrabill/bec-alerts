@@ -89,6 +89,7 @@ def listen(
     endpoint_url,
     connect_timeout,
     read_timeout,
+    worker_message_count,
 ):
     queue_backend = SQSQueueBackend(
         queue_name=queue_name,
@@ -98,13 +99,15 @@ def listen(
     )
 
     print('Waiting for an event...')
-    while True:
+    messages_processed = 0
+    while messages_processed < worker_message_count:
         try:
             for event_data in queue_backend.receive_events():
                 event = SentryEvent(event_data)
                 print(f'Received event: {event.id}')
                 try:
                     process_event(event)
+                    messages_processed += 1
                 except Exception as err:
                     print(f'Error processing event: {event.id}')
                     traceback.print_exc()
@@ -120,6 +123,7 @@ def listen(
 @click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
 @click.option('--process_count', default=os.cpu_count(), envvar='PROCESSOR_PROCESS_COUNT')
+@click.option('--worker-message-count', default=200, envvar='PROCESSOR_WORKER_MESSAGE_COUNT')
 def main(
     sleep_delay,
     queue_name,
@@ -127,16 +131,35 @@ def main(
     connect_timeout,
     read_timeout,
     process_count,
+    worker_message_count,
 ):
     print('Starting processor workers')
     processes = []
+    listen_kwargs = {
+        'sleep_delay': sleep_delay,
+        'queue_name': queue_name,
+        'endpoint_url': endpoint_url,
+        'connect_timeout': connect_timeout,
+        'read_timeout': read_timeout,
+        'worker_message_count': worker_message_count,
+    }
     for k in range(process_count):
-        process = Process(target=listen, kwargs={
-            'sleep_delay': sleep_delay,
-            'queue_name': queue_name,
-            'endpoint_url': endpoint_url,
-            'connect_timeout': connect_timeout,
-            'read_timeout': read_timeout,
-        })
-        process.start()
+        process = Process(target=listen, kwargs=listen_kwargs)
         processes.append(process)
+
+    try:
+        for process in processes:
+            process.start()
+
+        # Watch for terminated processes and replace them
+        while True:
+            for k, process in enumerate(processes):
+                if not process.is_alive():
+                    print('Worker died, restarting process.')
+                    processes[k] = Process(target=listen, kwargs=listen_kwargs)
+                    processes[k].start()
+                time.sleep(5)
+    except KeyboardInterrupt:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()

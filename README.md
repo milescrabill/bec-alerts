@@ -97,6 +97,7 @@ The following environment variables are available:
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 | `PROCESSOR_PROCESS_COUNT` | :x: | System CPU count | Number of worker processes to start |
+| `PROCESSOR_WORKER_MESSAGE_COUNT` | :x: | `200` | Number of messages a worker should process before terminating; a new worker process is started to take its place. Workers may process slightly more messages than this number before shutting down due to message batching. |
 
 
 ### Watcher
