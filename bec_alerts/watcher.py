@@ -3,19 +3,19 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import click
 import time
+import traceback
 from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
 
 from bec_alerts.alert_backends import ConsoleAlertBackend, EmailAlertBackend
-from bec_alerts.models import Issue, TriggerRun
+from bec_alerts.models import Issue, TriggerRun, User
 from bec_alerts.triggers import triggers
 from bec_alerts.utils import latest_nightly_appbuildid
 
 
-@transaction.atomic
-def process_triggers(alert_backend):
+def process_triggers(alert_backend, now):
     last_finished_run = TriggerRun.objects.filter(finished=True).order_by('-ran_at').first()
     if last_finished_run:
         issues = Issue.objects.filter(last_seen__gte=last_finished_run.ran_at)
@@ -26,53 +26,58 @@ def process_triggers(alert_backend):
     latest_nightly_appbuildid.cache_clear()
 
     # Evaluate triggers
-    triggered_issues = {}
+    alerts_to_send = []
     for trigger in triggers:
-        triggered_issues[trigger] = []
-        for issue in issues:
-            if trigger(None, issue):
-                triggered_issues[trigger].append(issue)
+        for email in trigger.emails:
+            user, created = User.objects.get_or_create(email=email)
+            for issue in issues:
+                if trigger(user, issue):
+                        alerts_to_send.append((trigger, user, issue))
 
     # Send notifications
-    for trigger, issues in triggered_issues.items():
-        if issues:
-            alert_backend.send_alert(trigger, issues)
+    for trigger, user, issue in alerts_to_send:
+        # Don't abort just because we failed to send a single notification
+        try:
+            alert_backend.handle_alert(now, trigger, user, issue)
+        except Exception as err:
+            print(
+                f'Error sending notification for trigger {trigger.name} (issue '
+                f'{issue.fingerprint}) to user {user.email}'
+            )
+            traceback.print_exc()
 
 
+@transaction.atomic
 def run_job(
     dry_run,
+    alert_backend,
     from_email,
     endpoint_url,
     connect_timeout,
     read_timeout,
     verify_email,
 ):
+    now = timezone.now()
+
     if dry_run:
-        alert_backend = ConsoleAlertBackend()
-        process_triggers(alert_backend)
+        process_triggers(alert_backend, now)
     else:
-        current_run = TriggerRun(ran_at=timezone.now(), finished=False)
+        current_run = TriggerRun(ran_at=now, finished=False)
         current_run.save()
 
-        alert_backend = EmailAlertBackend(
-            from_email=from_email,
-            endpoint_url=endpoint_url,
-            connect_timeout=connect_timeout,
-            read_timeout=read_timeout,
-            verify_email=verify_email,
-        )
-        process_triggers(alert_backend)
+        process_triggers(alert_backend, now)
 
         current_run.finished = True
         current_run.save()
 
         # Remove run logs older than 7 days
-        TriggerRun.objects.filter(ran_at__lte=current_run.ran_at - timedelta(days=7)).delete()
+        TriggerRun.objects.filter(ran_at__lte=now - timedelta(days=7)).delete()
 
 
 @click.command()
 @click.option('--once', is_flag=True, default=False)
-@click.option('--dry-run', is_flag=True, default=False, is_eager=True)
+@click.option('--dry-run', is_flag=True, default=False)
+@click.option('--console-alerts', is_flag=True, default=False)
 @click.option('--verify-email', is_flag=True, default=False, envvar='SES_VERIFY_EMAIL')
 @click.option('--sleep-delay', default=300, envvar='WATCHER_SLEEP_DELAY')
 @click.option('--from-email', default='notifications@sentry.prod.mozaws.net', envvar='SES_FROM_EMAIL')
@@ -82,6 +87,7 @@ def run_job(
 def main(
     once,
     dry_run,
+    console_alerts,
     sleep_delay,
     from_email,
     endpoint_url,
@@ -89,10 +95,23 @@ def main(
     read_timeout,
     verify_email,
 ):
+    if console_alerts:
+        alert_backend = ConsoleAlertBackend(dry_run=dry_run)
+    else:
+        alert_backend = EmailAlertBackend(
+            dry_run=dry_run,
+            from_email=from_email,
+            endpoint_url=endpoint_url,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            verify_email=verify_email,
+        )
+
     while True:
         try:
             run_job(
                 dry_run=dry_run,
+                alert_backend=alert_backend,
                 from_email=from_email,
                 endpoint_url=endpoint_url,
                 connect_timeout=connect_timeout,
@@ -100,7 +119,8 @@ def main(
                 verify_email=verify_email,
             )
         except Exception as err:
-            print(f'Error running triggers: {err}')
+            print(f'Error running triggers:')
+            traceback.print_exc()
 
         if once:
             break

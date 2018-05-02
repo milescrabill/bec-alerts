@@ -16,6 +16,11 @@ def trigger(trigger_name, *emails):
     return wrapper
 
 
-@trigger('Test notification', 'test@example.com')
+@trigger('Always notify', 'test@example.com')
 def should_notify_test(user, issue):
     return True
+
+
+@trigger('Notify if new', 'test@example.com')
+def new_notify(user, issue):
+    return not user.has_been_notified_about(issue)

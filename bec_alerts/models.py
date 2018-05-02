@@ -8,6 +8,13 @@ from django.utils import timezone
 
 class User(models.Model):
     email = models.EmailField(unique=True)
+    issues = models.ManyToManyField('Issue', through='UserIssue')
+
+    def has_been_notified_about(self, issue):
+        try:
+            return UserIssue.objects.get(user=self, issue=issue).last_notified is not None
+        except UserIssue.DoesNotExist:
+            return False
 
 
 class Issue(models.Model):
@@ -15,6 +22,15 @@ class Issue(models.Model):
     last_seen = models.DateTimeField(null=True, default=None)
     module = models.CharField(max_length=255, default='')
     stack_frames = JSONField(default=dict)
+
+
+class UserIssue(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
+    last_notified = models.DateTimeField(null=True, default=None)
+
+    class Meta:
+        unique_together = ['user', 'issue']
 
 
 class TriggerRun(models.Model):
