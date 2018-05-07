@@ -87,6 +87,42 @@ class IssueBucketManager(models.Manager):
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
+    def top_issues(self, start_date=None, end_date=None, limit=10):
+        with connection.cursor() as cursor:
+            where_clauses = []
+            params = {'limit': limit}
+
+            if start_date:
+                where_clauses.append('date >= %(start_date)s')
+                params['start_date'] = start_date
+
+            if end_date:
+                where_clauses.append('date <= %(end_date)s')
+                params['end_date'] = end_date
+
+            where_query = ''
+            if where_clauses:
+                where_query = f'WHERE {" AND ".join(where_clauses)}'
+
+            query = f'''
+                SELECT
+                    issue_id,
+                    hll_cardinality(hll_union_agg(count_set)) AS event_count
+                FROM bec_alerts_issuebucket
+                {where_query}
+                GROUP BY issue_id
+                ORDER BY event_count DESC
+                LIMIT %(limit)s
+            '''
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            issue_ids = [row[0] for row in rows]
+            issues_by_id = {issue.id: issue for issue in Issue.objects.filter(id__in=issue_ids)}
+
+            return [(row[1], issues_by_id[row[0]]) for row in rows]
+
 
 class IssueBucket(models.Model):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
