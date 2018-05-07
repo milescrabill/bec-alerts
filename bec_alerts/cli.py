@@ -4,6 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import click
 import os
+import sys
 from pathlib import Path
 
 import django
@@ -35,7 +36,10 @@ def manage(manage_args):
 
 @cli.command()
 @click.option('--dsn', envvar='SENTRY_DSN')
-def simulate_error(dsn):
+@click.option('--message', default='Simulated error')
+@click.option('--fingerprint', default='{{ default }}')
+@click.option('--traceback/--no-traceback', default=True)
+def simulate_error(dsn, message, fingerprint, traceback):
     if not dsn:
         raise RuntimeError(
             'A DSN must be provided by either the --dsn argument or SENTRY_DSN environment '
@@ -44,9 +48,11 @@ def simulate_error(dsn):
 
     client = Client(dsn)
     try:
-        1 / 0
-    except ZeroDivisionError:
-        client.captureException()
+        raise Exception(message)
+    except Exception:
+        err_type, err_value, err_traceback = sys.exc_info()
+        exc_info = (err_type, err_value, err_traceback if traceback else None)
+        client.captureException(exc_info=exc_info, fingerprint=[fingerprint])
     print('Error sent')
 
 

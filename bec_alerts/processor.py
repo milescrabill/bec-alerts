@@ -29,10 +29,10 @@ class SentryEvent:
     @cached_property
     def fingerprint(self):
         """
-        Fingerprints are actually an array of values, but we only use
-        the default fingerprint algorithm, which uses a single value.
+        Fingerprints are actually an array of values, but we want to
+        treat it as a single hash-like value.
         """
-        return self.data['fingerprints'][0]
+        return ':'.join(self.data['fingerprints'])
 
     def get_entry(self, entry_type):
         for entry in self.data.get('entries', []):
@@ -61,7 +61,11 @@ class SentryEvent:
 
     @cached_property
     def stack_frames(self):
-        return self.exception.get('stacktrace', {}).get('frames', [])
+        stacktrace = self.exception.get('stacktrace')
+        if stacktrace:
+            return stacktrace.get('frames', [])
+
+        return []
 
 
 def process_event(event):
@@ -104,7 +108,7 @@ def listen(
         try:
             for event_data in queue_backend.receive_events():
                 event = SentryEvent(event_data)
-                print(f'Received event: {event.id}')
+                print(f'Received event ID: {event.id} (fingerprint={event.fingerprint})')
                 try:
                     process_event(event)
                     messages_processed += 1
