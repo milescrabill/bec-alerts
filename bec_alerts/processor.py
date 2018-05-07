@@ -27,6 +27,14 @@ class SentryEvent:
         return self.data['eventID']
 
     @cached_property
+    def message(self):
+        return self.data['message']
+
+    @cached_property
+    def groupId(self):
+        return self.data['groupID']
+
+    @cached_property
     def fingerprint(self):
         """
         Fingerprints are actually an array of values, but we want to
@@ -71,6 +79,8 @@ class SentryEvent:
 def process_event(event):
     # Create issue, or update the last_seen date for it
     issue, created = Issue.objects.get_or_create(fingerprint=event.fingerprint, defaults={
+        'message': event.message,
+        'groupId': event.groupId,
         'last_seen': event.datetime_received,
         'module': event.module,
         'stack_frames': event.stack_frames,

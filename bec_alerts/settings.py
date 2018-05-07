@@ -20,3 +20,12 @@ INSTALLED_APPS = (
 )
 
 SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.jinja2.Jinja2',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {},
+    },
+]

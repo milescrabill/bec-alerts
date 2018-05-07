@@ -22,6 +22,8 @@ class Issue(models.Model):
     last_seen = models.DateTimeField(null=True, default=None)
     module = models.CharField(max_length=255, default='')
     stack_frames = JSONField(default=dict)
+    message = models.CharField(max_length=255, default='')
+    groupId = models.CharField(max_length=255, default='')
 
 
 class UserIssue(models.Model):

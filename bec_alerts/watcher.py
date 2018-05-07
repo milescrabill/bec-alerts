@@ -10,12 +10,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from bec_alerts.alert_backends import ConsoleAlertBackend, EmailAlertBackend
-from bec_alerts.models import Issue, TriggerRun, User
-from bec_alerts.triggers import triggers
+from bec_alerts.models import Issue, TriggerRun
+from bec_alerts.triggers import get_trigger_classes
 from bec_alerts.utils import latest_nightly_appbuildid
 
 
-def process_triggers(alert_backend, now):
+def evaluate_triggers(alert_backend, dry_run, now):
     last_finished_run = TriggerRun.objects.filter(finished=True).order_by('-ran_at').first()
     if last_finished_run:
         issues = Issue.objects.filter(last_seen__gte=last_finished_run.ran_at)
@@ -26,25 +26,10 @@ def process_triggers(alert_backend, now):
     latest_nightly_appbuildid.cache_clear()
 
     # Evaluate triggers
-    alerts_to_send = []
-    for trigger in triggers:
-        for email in trigger.emails:
-            user, created = User.objects.get_or_create(email=email)
-            for issue in issues:
-                if trigger(user, issue):
-                        alerts_to_send.append((trigger, user, issue))
-
-    # Send notifications
-    for trigger, user, issue in alerts_to_send:
-        # Don't abort just because we failed to send a single notification
-        try:
-            alert_backend.handle_alert(now, trigger, user, issue)
-        except Exception as err:
-            print(
-                f'Error sending notification for trigger {trigger.name} (issue '
-                f'{issue.fingerprint}) to user {user.email}'
-            )
-            traceback.print_exc()
+    for trigger_class in get_trigger_classes():
+        trigger = trigger_class(alert_backend, dry_run, now)
+        for issue in issues:
+            trigger.evaluate(issue)
 
 
 @transaction.atomic
@@ -60,12 +45,12 @@ def run_job(
     now = timezone.now()
 
     if dry_run:
-        process_triggers(alert_backend, now)
+        evaluate_triggers(alert_backend, dry_run, now)
     else:
         current_run = TriggerRun(ran_at=now, finished=False)
         current_run.save()
 
-        process_triggers(alert_backend, now)
+        evaluate_triggers(alert_backend, dry_run, now)
 
         current_run.finished = True
         current_run.save()
@@ -96,10 +81,9 @@ def main(
     verify_email,
 ):
     if console_alerts:
-        alert_backend = ConsoleAlertBackend(dry_run=dry_run)
+        alert_backend = ConsoleAlertBackend()
     else:
         alert_backend = EmailAlertBackend(
-            dry_run=dry_run,
             from_email=from_email,
             endpoint_url=endpoint_url,
             connect_timeout=connect_timeout,
