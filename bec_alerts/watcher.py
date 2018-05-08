@@ -1,11 +1,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-import click
 import time
 import traceback
 from datetime import timedelta
 
+import click
+import datadog
 from django.db import transaction
 from django.utils import timezone
 
@@ -69,6 +70,8 @@ def run_job(
 @click.option('--endpoint-url', envvar='SES_ENDPOINT_URL')
 @click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
+@click.option('--datadog-api-key', envvar='DATADOG_API_KEY')
+@click.option('--datadog-counter-name', envvar='DATADOG_COUNTER_NAME', default='bec-alerts.watcher.health')
 def main(
     once,
     dry_run,
@@ -79,7 +82,12 @@ def main(
     connect_timeout,
     read_timeout,
     verify_email,
+    datadog_api_key,
+    datadog_counter_name,
 ):
+    if datadog_api_key:
+        datadog.initialize(api_key=datadog_api_key)
+
     if console_alerts:
         alert_backend = ConsoleAlertBackend()
     else:
@@ -105,6 +113,9 @@ def main(
         except Exception as err:
             print(f'Error running triggers:')
             traceback.print_exc()
+        finally:
+            if datadog_api_key:
+                datadog.statsd.increment(datadog_counter_name)
 
         if once:
             break

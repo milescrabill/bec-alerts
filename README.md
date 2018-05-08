@@ -112,13 +112,20 @@ The following environment variables are available:
 | ---- | --------- | ------- | ----------- |
 | `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
 | `SES_FROM_EMAIL` | :white_check_mark: | `notifications@sentry.prod.mozaws.net` | Email to use in the From field for notifications |
-| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+| `DATABASE_URL` | :white_check_mark: | | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+| `DATADOG_API_KEY` | :white_check_mark: | | API key for incrementing the healthcheck counter in Datadog via DogStatsD. |
+| `DATADOG_COUNTER_NAME` | :x: | `bec-alerts.watcher.health` | Name of the DogStatsD counter to increment for health checks. |
 | `SES_VERIFY_EMAIL` | :x: | `False` | If True, the watcher will attempt to verify the `SES_VERIFY_EMAIL` via API on startup. Should probably be False in production. |
 | `WATCHER_SLEEP_DELAY` | :x: | `300` | Seconds to wait between checking for new events and alert triggers |
 | `SES_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
 | `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
 | `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 
+## Monitoring
+
+- Each time the Watcher process evalutes triggers and potentially sends emails, it increments a counter in Datadog using DogStatsD. This behavior is controlled by the `DATADOG_API_KEY` and `DATADOG_COUNTER_NAME` environment variables.
+
+  This counter can be used to monitor if the watcher is still running,
 
 ## License
 
