@@ -42,7 +42,7 @@ Prerequisites:
    - Once you see the "Getting Started" page that includes a code sample of sending an error via Python, copy the DSN (which looks like `http://really_long_hash@localhost:9000/2`) to a `.env` file at the root of your repo that should look like this:
 
      ```
-     SENTRY_DSN=http://really_long_hash@sentry:9000/2
+     SIMULATE_SENTRY_DSN=http://really_long_hash@sentry:9000/2
      ```
 
      __Important:__ You must change the `localhost` in the DSN to `sentry`, since it will be used in a Docker container where Sentry is not running on localhost.
@@ -59,7 +59,7 @@ Prerequisites:
 
 ### Simulating an Error
 
-If you've set `SENTRY_DSN` in your `.env` file properly, you can simulate sending an error to your running Sentry instance with the `simulate_error` command:
+If you've set `SIMULATE_SENTRY_DSN` in your `.env` file properly, you can simulate sending an error to your running Sentry instance with the `simulate_error` command:
 
 ```sh
 docker-compose run processor bec-alerts simulate_error
@@ -89,8 +89,9 @@ The following environment variables are available:
 | Name | Required? | Default | Description |
 | ---- | --------- | ------- | ----------- |
 | `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
-| `DATABASE_URL` | :white_check_mark: | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
+| `DATABASE_URL` | :white_check_mark: | | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 | `DJANGO_SECRET_KEY` | :white_check_mark: | | Secret key for Django's cryptographic signing. We don't really use it but Django fails to start without it. Set to a secret, random string. |
+| `SENTRY_DSN` | :white_check_mark: | | DSN used to send errors to Sentry. |
 | `PROCESSOR_SLEEP_DELAY` | :x: | `20` | Seconds to wait between polling the queue |
 | `SQS_QUEUE_NAME` | :x: | `sentry_errors` | Name of the queue to poll for events. |
 | `SQS_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
@@ -114,6 +115,7 @@ The following environment variables are available:
 | `SES_FROM_EMAIL` | :white_check_mark: | `notifications@sentry.prod.mozaws.net` | Email to use in the From field for notifications |
 | `DATABASE_URL` | :white_check_mark: | | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 | `DATADOG_API_KEY` | :white_check_mark: | | API key for incrementing the healthcheck counter in Datadog via DogStatsD. |
+| `SENTRY_DSN` | :white_check_mark: | | DSN used to send errors to Sentry. |
 | `DATADOG_COUNTER_NAME` | :x: | `bec-alerts.watcher.health` | Name of the DogStatsD counter to increment for health checks. |
 | `SES_VERIFY_EMAIL` | :x: | `False` | If True, the watcher will attempt to verify the `SES_VERIFY_EMAIL` via API on startup. Should probably be False in production. |
 | `WATCHER_SLEEP_DELAY` | :x: | `300` | Seconds to wait between checking for new events and alert triggers |

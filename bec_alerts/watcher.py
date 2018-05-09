@@ -2,7 +2,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import time
-import traceback
 from datetime import timedelta
 
 import click
@@ -11,6 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from bec_alerts.alert_backends import ConsoleAlertBackend, EmailAlertBackend
+from bec_alerts.errors import captureException, initialize_error_reporting
 from bec_alerts.models import Issue, TriggerRun
 from bec_alerts.triggers import get_trigger_classes
 from bec_alerts.utils import latest_nightly_appbuildid
@@ -72,6 +72,7 @@ def run_job(
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
 @click.option('--datadog-api-key', envvar='DATADOG_API_KEY')
 @click.option('--datadog-counter-name', envvar='DATADOG_COUNTER_NAME', default='bec-alerts.watcher.health')
+@click.option('--sentry-dsn', envvar='SENTRY_DSN')
 def main(
     once,
     dry_run,
@@ -84,20 +85,28 @@ def main(
     verify_email,
     datadog_api_key,
     datadog_counter_name,
+    sentry_dsn,
 ):
-    if datadog_api_key:
-        datadog.initialize(api_key=datadog_api_key)
+    initialize_error_reporting(sentry_dsn)
 
-    if console_alerts:
-        alert_backend = ConsoleAlertBackend()
-    else:
-        alert_backend = EmailAlertBackend(
-            from_email=from_email,
-            endpoint_url=endpoint_url,
-            connect_timeout=connect_timeout,
-            read_timeout=read_timeout,
-            verify_email=verify_email,
-        )
+    try:
+        if datadog_api_key:
+            datadog.initialize(api_key=datadog_api_key)
+
+        if console_alerts:
+            alert_backend = ConsoleAlertBackend()
+        else:
+            alert_backend = EmailAlertBackend(
+                from_email=from_email,
+                endpoint_url=endpoint_url,
+                connect_timeout=connect_timeout,
+                read_timeout=read_timeout,
+                verify_email=verify_email,
+            )
+    except Exception:
+        # Just make sure Sentry knows that we failed on startup
+        captureException()
+        raise
 
     while True:
         try:
@@ -111,8 +120,7 @@ def main(
                 verify_email=verify_email,
             )
         except Exception as err:
-            print(f'Error running triggers:')
-            traceback.print_exc()
+            captureException(f'Error running triggers')
         finally:
             if datadog_api_key:
                 datadog.statsd.increment(datadog_counter_name)

@@ -3,7 +3,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import os
 import time
-import traceback
 from datetime import datetime
 from multiprocessing import Process
 
@@ -11,6 +10,7 @@ import click
 from django.utils import timezone
 from django.utils.functional import cached_property
 
+from bec_alerts.errors import captureException, initialize_error_reporting
 from bec_alerts.models import Issue, IssueBucket
 from bec_alerts.queue_backends import SQSQueueBackend
 
@@ -104,7 +104,10 @@ def listen(
     connect_timeout,
     read_timeout,
     worker_message_count,
+    sentry_dsn,
 ):
+    initialize_error_reporting(sentry_dsn)
+
     queue_backend = SQSQueueBackend(
         queue_name=queue_name,
         endpoint_url=endpoint_url,
@@ -119,15 +122,16 @@ def listen(
             for event_data in queue_backend.receive_events():
                 event = SentryEvent(event_data)
                 print(f'Received event ID: {event.id} (fingerprint={event.fingerprint})')
+
+                # The nested try avoids errors on a single event stopping us
+                # from processing the rest of the received events.
                 try:
                     process_event(event)
                     messages_processed += 1
                 except Exception as err:
-                    print(f'Error processing event: {event.id}')
-                    traceback.print_exc()
+                    captureException(f'Error processing event: {event.id}')
         except Exception as err:
-            print(f'Error receiving message: {err}')
-            time.sleep(sleep_delay)
+            captureException(f'Error receiving message: {err}')
 
 
 @click.command()
@@ -138,6 +142,7 @@ def listen(
 @click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
 @click.option('--process_count', default=os.cpu_count(), envvar='PROCESSOR_PROCESS_COUNT')
 @click.option('--worker-message-count', default=200, envvar='PROCESSOR_WORKER_MESSAGE_COUNT')
+@click.option('--sentry-dsn', envvar='SENTRY_DSN')
 def main(
     sleep_delay,
     queue_name,
@@ -146,7 +151,10 @@ def main(
     read_timeout,
     process_count,
     worker_message_count,
+    sentry_dsn,
 ):
+    initialize_error_reporting(sentry_dsn)
+
     print('Starting processor workers')
     processes = []
     listen_kwargs = {
@@ -156,6 +164,7 @@ def main(
         'connect_timeout': connect_timeout,
         'read_timeout': read_timeout,
         'worker_message_count': worker_message_count,
+        'sentry_dsn': sentry_dsn,
     }
     for k in range(process_count):
         process = Process(target=listen, kwargs=listen_kwargs)
@@ -177,3 +186,5 @@ def main(
         for process in processes:
             if process.is_alive():
                 process.terminate()
+    except Exception:
+        captureException()

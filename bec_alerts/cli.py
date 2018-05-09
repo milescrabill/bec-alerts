@@ -35,7 +35,7 @@ def manage(manage_args):
 
 
 @cli.command()
-@click.option('--dsn', envvar='SENTRY_DSN')
+@click.option('--dsn', envvar='SIMULATE_SENTRY_DSN')
 @click.option('--message', default='Simulated error')
 @click.option('--fingerprint', default='{{ default }}')
 @click.option('--traceback/--no-traceback', default=True)
