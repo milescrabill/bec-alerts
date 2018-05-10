@@ -76,15 +76,9 @@ The service consists of a few AWS services and a Docker image that is intended t
 
 AWS credentials are pulled from IAM. The region is provided by the `AWS_DEFAULT_REGION` environment variable.
 
-The Docker image defined in `Dockerfile` is used to run two separate processes:
+The Docker image defined in `Dockerfile` is used to run two separate processes: the processor, and the watcher, described in the following sections.
 
-### Processor
-
-Command: `bec-alerts processor`
-
-Reads from SQS to fetch incoming events from Sentry, processes them, and saves the resulting data to Postgres.
-
-The following environment variables are available:
+The following environment variables are available for all processes:
 
 | Name | Required? | Default | Description |
 | ---- | --------- | ------- | ----------- |
@@ -92,11 +86,24 @@ The following environment variables are available:
 | `DATABASE_URL` | :white_check_mark: | | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 | `DJANGO_SECRET_KEY` | :white_check_mark: | | Secret key for Django's cryptographic signing. We don't really use it but Django fails to start without it. Set to a secret, random string. |
 | `SENTRY_DSN` | :white_check_mark: | | DSN used to send errors to Sentry. |
+| `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
+| `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
+| `LOG_FORMAT` | :x: | `mozlog` | Format to output logs in. Use `mozlog` for mozlog-compatible logs, or `compose` for a human-readable format suited for docker-compose output. |
+| `LOG_LEVEL` | :x: | `INFO` | Minimum log level to output. One of `CRITICAL`, `ERROR`, `WARNING`, `INFO`, or `DEBUG`. |
+
+### Processor
+
+Command: `bec-alerts processor`
+
+Reads from SQS to fetch incoming events from Sentry, processes them, and saves the resulting data to Postgres. This process will launch and manage a pool of subprocesses for listening and processing data.
+
+The following environment variables are available for the processor:
+
+| Name | Required? | Default | Description |
+| ---- | --------- | ------- | ----------- |
 | `PROCESSOR_SLEEP_DELAY` | :x: | `20` | Seconds to wait between polling the queue |
 | `SQS_QUEUE_NAME` | :x: | `sentry_errors` | Name of the queue to poll for events. |
 | `SQS_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
-| `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
-| `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 | `PROCESSOR_PROCESS_COUNT` | :x: | System CPU count | Number of worker processes to start |
 | `PROCESSOR_WORKER_MESSAGE_COUNT` | :x: | `200` | Number of messages a worker should process before terminating; a new worker process is started to take its place. Workers may process slightly more messages than this number before shutting down due to message batching. |
 
@@ -107,21 +114,16 @@ Command: `bec-alerts watcher`
 
 Periodically checks for events that have been processed since the last run, and evaluates alert triggers to determine if we should send a notification to users. This process implements its own sleep timer.
 
-The following environment variables are available:
+The following environment variables are available for the watcher:
 
 | Name | Required? | Default | Description |
 | ---- | --------- | ------- | ----------- |
-| `AWS_DEFAULT_REGION` | :white_check_mark: | | Region for connecting to AWS |
 | `SES_FROM_EMAIL` | :white_check_mark: | `notifications@sentry.prod.mozaws.net` | Email to use in the From field for notifications |
-| `DATABASE_URL` | :white_check_mark: | | URL with connection data for the database. Typically a postgres URL of the form `postgres://user:password@host/database_name`. |
 | `DATADOG_API_KEY` | :white_check_mark: | | API key for incrementing the healthcheck counter in Datadog via DogStatsD. |
-| `SENTRY_DSN` | :white_check_mark: | | DSN used to send errors to Sentry. |
 | `DATADOG_COUNTER_NAME` | :x: | `bec-alerts.watcher.health` | Name of the DogStatsD counter to increment for health checks. |
 | `SES_VERIFY_EMAIL` | :x: | `False` | If True, the watcher will attempt to verify the `SES_VERIFY_EMAIL` via API on startup. Should probably be False in production. |
 | `WATCHER_SLEEP_DELAY` | :x: | `300` | Seconds to wait between checking for new events and alert triggers |
 | `SES_ENDPOINT_URL` | :x: | | Endpoint URL for connection to AWS. Only required for local development. |
-| `AWS_CONNECT_TIMEOUT` | :x: | `30` | Timeout for connecting to AWS |
-| `AWS_READ_TIMEOUT` | :x: | `30` | Timeout for reading a response from AWS |
 
 ## Monitoring
 

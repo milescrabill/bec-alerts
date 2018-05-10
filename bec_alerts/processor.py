@@ -1,6 +1,8 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+import itertools
+import logging
 import os
 import time
 from datetime import datetime
@@ -107,6 +109,7 @@ def listen(
     sentry_dsn,
 ):
     initialize_error_reporting(sentry_dsn)
+    logger = logging.getLogger('bec-alerts.processor.worker')
 
     queue_backend = SQSQueueBackend(
         queue_name=queue_name,
@@ -115,13 +118,13 @@ def listen(
         read_timeout=read_timeout,
     )
 
-    print('Waiting for an event...')
+    logger.info('Waiting for an event')
     messages_processed = 0
     while messages_processed < worker_message_count:
         try:
             for event_data in queue_backend.receive_events():
                 event = SentryEvent(event_data)
-                print(f'Received event ID: {event.id} (fingerprint={event.fingerprint})')
+                logger.debug(f'Received event ID: {event.id}')
 
                 # The nested try avoids errors on a single event stopping us
                 # from processing the rest of the received events.
@@ -154,8 +157,10 @@ def main(
     sentry_dsn,
 ):
     initialize_error_reporting(sentry_dsn)
+    logger = logging.getLogger('bec-alerts.processor')
+    worker_ids = itertools.count()
 
-    print('Starting processor workers')
+    logger.info('Starting processor workers')
     processes = []
     listen_kwargs = {
         'sleep_delay': sleep_delay,
@@ -168,6 +173,7 @@ def main(
     }
     for k in range(process_count):
         process = Process(target=listen, kwargs=listen_kwargs)
+        process.name = f'worker-{next(worker_ids)}'
         processes.append(process)
 
     try:
@@ -178,8 +184,9 @@ def main(
         while True:
             for k, process in enumerate(processes):
                 if not process.is_alive():
-                    print('Worker died, restarting process.')
+                    logger.info('Worker died, restarting process.')
                     processes[k] = Process(target=listen, kwargs=listen_kwargs)
+                    processes[k].name = f'worker-{next(worker_ids)}'
                     processes[k].start()
                 time.sleep(5)
     except KeyboardInterrupt:

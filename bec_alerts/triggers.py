@@ -1,6 +1,8 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+import logging
+
 from django.template.loader import render_to_string
 
 from bec_alerts.models import User, UserIssue
@@ -16,6 +18,7 @@ class Trigger:
         self.alert_backend = alert_backend
         self.dry_run = dry_run
         self.now = now
+        self.logger = logging.getLogger('bec-alerts.triggers')
 
     def get_users(self):
         users = []
@@ -25,6 +28,10 @@ class Trigger:
         return users
 
     def alert_user(self, user, issue):
+        self.logger.info(
+            f'Trigger {self.__name__} alerting user {user.email} of issue {issue.fingerprint}'
+        )
+
         alert_body = render_to_string(self.template, {
             'user': user,
             'issue': issue,
@@ -46,6 +53,10 @@ class Trigger:
         raise NotImplementedError()
 
 
+def get_trigger_classes():
+    return Trigger.__subclasses__()
+
+
 class AlwaysNotifyTrigger(Trigger):
     emails = ['test@example.com']
     name = 'Error'
@@ -63,7 +74,3 @@ class NewNotifyTrigger(Trigger):
         for user in self.get_users():
             if not user.has_been_notified_about(issue):
                 self.alert_user(user, issue)
-
-
-def get_trigger_classes():
-    return Trigger.__subclasses__()

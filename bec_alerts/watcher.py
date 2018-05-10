@@ -1,6 +1,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+import logging
 import time
 from datetime import timedelta
 
@@ -16,48 +17,55 @@ from bec_alerts.triggers import get_trigger_classes
 from bec_alerts.utils import latest_nightly_appbuildid
 
 
-def evaluate_triggers(alert_backend, dry_run, now):
-    last_finished_run = TriggerRun.objects.filter(finished=True).order_by('-ran_at').first()
-    if last_finished_run:
-        issues = Issue.objects.filter(last_seen__gte=last_finished_run.ran_at)
-    else:
-        issues = Issue.objects.all()
+class TriggerEvaluator:
+    def __init__(self, alert_backend, dry_run):
+        self.alert_backend = alert_backend
+        self.dry_run = dry_run
 
-    # Clear caches since we're starting a new run
-    latest_nightly_appbuildid.cache_clear()
+        self.now = timezone.now()
+        self.logger = logging.getLogger('bec-alerts.watcher')
 
-    # Evaluate triggers
-    for trigger_class in get_trigger_classes():
-        trigger = trigger_class(alert_backend, dry_run, now)
-        for issue in issues:
-            trigger.evaluate(issue)
+    @transaction.atomic
+    def run_job(self):
+        if self.dry_run:
+            self.logger.info('--dry-run passed; no run logs will be saved.')
+            self.evaluate_triggers(self.now)
+        else:
+            current_run = TriggerRun(ran_at=self.now, finished=False)
+            current_run.save()
 
+            self.evaluate_triggers(self.now)
 
-@transaction.atomic
-def run_job(
-    dry_run,
-    alert_backend,
-    from_email,
-    endpoint_url,
-    connect_timeout,
-    read_timeout,
-    verify_email,
-):
-    now = timezone.now()
+            current_run.finished = True
+            current_run.save()
 
-    if dry_run:
-        evaluate_triggers(alert_backend, dry_run, now)
-    else:
-        current_run = TriggerRun(ran_at=now, finished=False)
-        current_run.save()
+            # Remove run logs older than 7 days
+            TriggerRun.objects.filter(ran_at__lte=self.now - timedelta(days=7)).delete()
 
-        evaluate_triggers(alert_backend, dry_run, now)
+    def evaluate_triggers(self):
+        last_finished_run = TriggerRun.objects.filter(finished=True).order_by('-ran_at').first()
+        if last_finished_run:
+            issues = Issue.objects.filter(last_seen__gte=last_finished_run.ran_at)
+        else:
+            issues = Issue.objects.all()
 
-        current_run.finished = True
-        current_run.save()
+        self.logger.info(f'Found {len(issues)} issues since last finished run.')
 
-        # Remove run logs older than 7 days
-        TriggerRun.objects.filter(ran_at__lte=now - timedelta(days=7)).delete()
+        # Clear caches since we're starting a new run
+        latest_nightly_appbuildid.cache_clear()
+
+        # Evaluate triggers
+        for trigger_class in get_trigger_classes():
+            trigger = trigger_class(self.alert_backend, self.dry_run, self.now)
+            for issue in issues:
+                # Don't let a single failure block all trigger evaluations
+                try:
+                    trigger.evaluate(issue)
+                except Exception:
+                    captureException(
+                        f'Error while running trigger {trigger.__name__} against issue '
+                        f'{issue.fingerprint}'
+                    )
 
 
 @click.command()
@@ -105,22 +113,15 @@ def main(
             )
     except Exception:
         # Just make sure Sentry knows that we failed on startup
-        captureException()
+        captureException('Failed during watcher startup')
         raise
 
     while True:
         try:
-            run_job(
-                dry_run=dry_run,
-                alert_backend=alert_backend,
-                from_email=from_email,
-                endpoint_url=endpoint_url,
-                connect_timeout=connect_timeout,
-                read_timeout=read_timeout,
-                verify_email=verify_email,
-            )
+            evaluator = TriggerEvaluator(alert_backend, dry_run)
+            evaluator.run_job()
         except Exception as err:
-            captureException(f'Error running triggers')
+            captureException(f'Error evaluating triggers')
         finally:
             if datadog_api_key:
                 datadog.statsd.increment(datadog_counter_name)

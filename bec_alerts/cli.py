@@ -3,6 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import click
+import logging.config
 import os
 import sys
 from pathlib import Path
@@ -24,8 +25,37 @@ from bec_alerts.watcher import main as watcher_main  # NOQA
 
 
 @click.group()
-def cli():
-    pass
+@click.option('--log-format', default='mozlog', envvar='LOG_FORMAT')
+@click.option('--log-level', default='INFO', envvar='LOG_LEVEL')
+def cli(log_format, log_level):
+    logging.config.dictConfig({
+        'version': 1,
+        'formatters': {
+            'mozlog': {
+                '()': 'dockerflow.logging.JsonLogFormatter',
+                'logger_name': 'bec-alerts'
+            },
+            'compose': {
+                'format': '%(processName)s | %(levelname)s | %(message)s',
+            },
+        },
+        'handlers': {
+            'console': {
+                'level': 'DEBUG',
+                'class': 'logging.StreamHandler',
+                'formatter': log_format
+            },
+        },
+        'loggers': {
+            'py.warnings': {
+                'handlers': ['console'],
+            },
+            'bec-alerts': {
+                'handlers': ['console'],
+                'level': log_level,
+            },
+        }
+    })
 
 
 @cli.command()

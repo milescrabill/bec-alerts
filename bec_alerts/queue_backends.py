@@ -54,7 +54,7 @@ class SQSQueueBackend(QueueBackend):
             MessageAttributeNames=[
                 'All'
             ],
-            VisibilityTimeout=0,
+            VisibilityTimeout=30,
             WaitTimeSeconds=self.wait_time,
         )
 

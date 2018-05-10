@@ -1,3 +1,4 @@
+import logging
 import traceback
 
 import raven
@@ -31,6 +32,8 @@ class SentryReporter:
 
 class LoggingReporter:
     def captureException(self, message):
+        # Create logger here since logging may not be configured at import time.
+        logger = logging.getLogger('bec-alerts.errors')
         if message:
-            print(message)
-        traceback.print_exc()
+            logger.error(message)
+        logger.error(traceback.format_exc())
