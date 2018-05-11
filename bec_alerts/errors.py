@@ -1,3 +1,6 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import logging
 import traceback
 
@@ -8,6 +11,10 @@ reporter = None
 
 
 def initialize_error_reporting(sentry_dsn=None):
+    """
+    Choose which reporting backend to use. Must be called before
+    captureException.
+    """
     global reporter
     if sentry_dsn:
         reporter = SentryReporter(sentry_dsn)
@@ -16,6 +23,7 @@ def initialize_error_reporting(sentry_dsn=None):
 
 
 def captureException(message=None):
+    """Call captureException on the configured reporting backend."""
     global reporter
     if reporter is None:
         raise RuntimeError('Cannot capture exception: initialize_error_reporting was not called')
@@ -23,6 +31,7 @@ def captureException(message=None):
 
 
 class SentryReporter:
+    """Reports errors to a Sentry instance."""
     def __init__(self, sentry_dsn):
         self.client = raven.Client(sentry_dsn)
 
@@ -31,6 +40,7 @@ class SentryReporter:
 
 
 class LoggingReporter:
+    """Logs errors to the bec-alerts.errors logger."""
     def captureException(self, message):
         # Create logger here since logging may not be configured at import time.
         logger = logging.getLogger('bec-alerts.errors')

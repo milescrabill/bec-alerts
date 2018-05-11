@@ -18,6 +18,7 @@ from bec_alerts.queue_backends import SQSQueueBackend
 
 
 class SentryEvent:
+    """Container for parsing event data from Sentry."""
     def __init__(self, data):
         self.data = data
 
@@ -26,6 +27,7 @@ class SentryEvent:
 
     @cached_property
     def id(self):
+        """Unique ID for the event."""
         return self.data['eventID']
 
     @cached_property
@@ -34,6 +36,7 @@ class SentryEvent:
 
     @cached_property
     def groupId(self):
+        """ID of the issue this event is grouped under."""
         return self.data['groupID']
 
     @cached_property
@@ -79,6 +82,10 @@ class SentryEvent:
 
 
 def process_event(event):
+    """
+    Generate and save aggregated data for the given event to the
+    database.
+    """
     # Create issue, or update the last_seen date for it
     issue, created = Issue.objects.get_or_create(fingerprint=event.fingerprint, defaults={
         'message': event.message,
@@ -108,6 +115,11 @@ def listen(
     worker_message_count,
     sentry_dsn,
 ):
+    """
+    Listen for incoming events and process them.
+
+    This is the entrypoint for worker processes.
+    """
     initialize_error_reporting(sentry_dsn)
     logger = logging.getLogger('bec-alerts.processor.worker')
 
@@ -119,6 +131,8 @@ def listen(
     )
 
     logger.info('Waiting for an event')
+
+    # Exit after worker_message_count events have been processed.
     messages_processed = 0
     while messages_processed < worker_message_count:
         try:
@@ -138,14 +152,44 @@ def listen(
 
 
 @click.command()
-@click.option('--sleep-delay', default=20, envvar='PROCESSOR_SLEEP_DELAY')
-@click.option('--queue-name', default='sentry_errors', envvar='SQS_QUEUE_NAME')
-@click.option('--endpoint-url', envvar='SQS_ENDPOINT_URL')
-@click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
-@click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
-@click.option('--process_count', default=os.cpu_count(), envvar='PROCESSOR_PROCESS_COUNT')
-@click.option('--worker-message-count', default=200, envvar='PROCESSOR_WORKER_MESSAGE_COUNT')
-@click.option('--sentry-dsn', envvar='SENTRY_DSN')
+@click.option(
+    '--sleep-delay',
+    default=20,
+    envvar='PROCESSOR_SLEEP_DELAY',
+)
+@click.option(
+    '--queue-name',
+    default='sentry_errors',
+    envvar='SQS_QUEUE_NAME',
+)
+@click.option(
+    '--endpoint-url',
+    envvar='SQS_ENDPOINT_URL',
+)
+@click.option(
+    '--connect-timeout',
+    default=30,
+    envvar='AWS_CONNECT_TIMEOUT',
+)
+@click.option(
+    '--read-timeout',
+    default=30,
+    envvar='AWS_READ_TIMEOUT',
+)
+@click.option(
+    '--process_count',
+    default=os.cpu_count(),
+    envvar='PROCESSOR_PROCESS_COUNT',
+)
+@click.option(
+    '--worker-message-count',
+    default=200,
+    envvar='PROCESSOR_WORKER_MESSAGE_COUNT',
+)
+@click.option(
+    '--sentry-dsn',
+    envvar='SENTRY_DSN',
+)
 def main(
     sleep_delay,
     queue_name,
@@ -156,6 +200,13 @@ def main(
     worker_message_count,
     sentry_dsn,
 ):
+    """
+    Listen for incoming events from Sentry and aggregate the data we
+    care about from them.
+
+    Manages a pool of subprocesses that perform the listening and
+    processing.
+    """
     initialize_error_reporting(sentry_dsn)
     logger = logging.getLogger('bec-alerts.processor')
     worker_ids = itertools.count()

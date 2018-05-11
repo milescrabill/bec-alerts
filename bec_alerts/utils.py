@@ -8,8 +8,9 @@ import requests
 
 @lru_cache(maxsize=2)
 def latest_nightly_appbuildid():
-    """Fetches the latest AppBuildID for Nightly from BuildHub. The return value
-    is cached, and reset between watcher runs.
+    """
+    Fetches the latest AppBuildID for Nightly from BuildHub. The return
+    value is cached, and reset between watcher runs.
 
     See https://github.com/mozilla-services/buildhub/issues/431 for more
     info.

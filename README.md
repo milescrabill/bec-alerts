@@ -57,13 +57,39 @@ Prerequisites:
 
    After configuring the plugin and enabling it, you should be able to submit errors to Sentry and see logging confirming that the processor received the post-processed events from Sentry.
 
+### Running the Processor
+
+To run the processor and related services:
+
+```sh
+docker-compose up
+```
+
 ### Simulating an Error
 
-If you've set `SIMULATE_SENTRY_DSN` in your `.env` file properly, you can simulate sending an error to your running Sentry instance with the `simulate_error` command:
+If you've set `SIMULATE_SENTRY_DSN` in your `.env` file properly, you can simulate sending an error to your running processor instance with the `simulate_error` command:
 
 ```sh
 docker-compose run processor bec-alerts simulate_error
 ```
+
+### Evaluating Triggers / Running Watcher
+
+After you've processed an error, you can evaluate the configured alert triggers
+with the watcher:
+
+```sh
+docker-compose run processor bec-alerts watcher --once --console-alerts --dry-run
+```
+
+- `--once` instructs the watcher to only run once; normally it will continue to run once every 5 minutes after it starts up.
+- `--console-alerts` enables logging alerts instead of sending them as emails.
+- `--dry-run` disables saving records of the run and other persistent data. This helps avoid issues with triggers that don't notify users of issues they've already seen.
+
+You should see log output stating how many issues were evaluated, and messages
+logged to the console if any alerts were triggered. It may be useful to set the
+`enabled` property on the example triggers in `bec_alerts/triggers.py`, which
+will trigger alerts whenever a new event is seen or when new events that the user has not seen before are seen.
 
 ## Deployment
 

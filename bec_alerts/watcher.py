@@ -18,6 +18,11 @@ from bec_alerts.utils import latest_nightly_appbuildid
 
 
 class TriggerEvaluator:
+    """
+    Creates Triggers from the definitions in bec_alerts.triggers and
+    evaluates them against all issues with new events since the last
+    evaluation run.
+    """
     def __init__(self, alert_backend, dry_run):
         self.alert_backend = alert_backend
         self.dry_run = dry_run
@@ -29,12 +34,12 @@ class TriggerEvaluator:
     def run_job(self):
         if self.dry_run:
             self.logger.info('--dry-run passed; no run logs will be saved.')
-            self.evaluate_triggers(self.now)
+            self.evaluate_triggers()
         else:
             current_run = TriggerRun(ran_at=self.now, finished=False)
             current_run.save()
 
-            self.evaluate_triggers(self.now)
+            self.evaluate_triggers()
 
             current_run.finished = True
             current_run.save()
@@ -69,18 +74,64 @@ class TriggerEvaluator:
 
 
 @click.command()
-@click.option('--once', is_flag=True, default=False)
-@click.option('--dry-run', is_flag=True, default=False)
-@click.option('--console-alerts', is_flag=True, default=False)
-@click.option('--verify-email', is_flag=True, default=False, envvar='SES_VERIFY_EMAIL')
-@click.option('--sleep-delay', default=300, envvar='WATCHER_SLEEP_DELAY')
-@click.option('--from-email', default='notifications@sentry.prod.mozaws.net', envvar='SES_FROM_EMAIL')
-@click.option('--endpoint-url', envvar='SES_ENDPOINT_URL')
-@click.option('--connect-timeout', default=30, envvar='AWS_CONNECT_TIMEOUT')
-@click.option('--read-timeout', default=30, envvar='AWS_READ_TIMEOUT')
-@click.option('--datadog-api-key', envvar='DATADOG_API_KEY')
-@click.option('--datadog-counter-name', envvar='DATADOG_COUNTER_NAME', default='bec-alerts.watcher.health')
-@click.option('--sentry-dsn', envvar='SENTRY_DSN')
+@click.option(
+    '--once',
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    '--dry-run',
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    '--console-alerts',
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    '--verify-email',
+    is_flag=True,
+    default=False,
+    envvar='SES_VERIFY_EMAIL',
+)
+@click.option(
+    '--sleep-delay',
+    default=300,
+    envvar='WATCHER_SLEEP_DELAY',
+)
+@click.option(
+    '--endpoint-url',
+    envvar='SES_ENDPOINT_URL',
+)
+@click.option(
+    '--connect-timeout',
+    default=30,
+    envvar='AWS_CONNECT_TIMEOUT',
+)
+@click.option(
+    '--read-timeout',
+    default=30,
+    envvar='AWS_READ_TIMEOUT',
+)
+@click.option(
+    '--datadog-api-key',
+    envvar='DATADOG_API_KEY',
+)
+@click.option(
+    '--sentry-dsn',
+    envvar='SENTRY_DSN',
+)
+@click.option(
+    '--datadog-counter-name',
+    default='bec-alerts.watcher.health',
+    envvar='DATADOG_COUNTER_NAME',
+)
+@click.option(
+    '--from-email',
+    default='notifications@sentry.prod.mozaws.net',
+    envvar='SES_FROM_EMAIL',
+)
 def main(
     once,
     dry_run,
@@ -95,6 +146,7 @@ def main(
     datadog_counter_name,
     sentry_dsn,
 ):
+    """Evaluate alert triggers and send alerts."""
     initialize_error_reporting(sentry_dsn)
 
     try:

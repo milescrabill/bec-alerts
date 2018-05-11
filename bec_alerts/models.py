@@ -7,6 +7,7 @@ from django.utils import timezone
 
 
 class User(models.Model):
+    """An email address and associated user info."""
     email = models.EmailField(unique=True)
     issues = models.ManyToManyField('Issue', through='UserIssue')
 
@@ -18,6 +19,12 @@ class User(models.Model):
 
 
 class Issue(models.Model):
+    """
+    A Sentry issue uniquely identified by a fingerprint.
+
+    Stores data needed to build error alerts for the issue. That data is
+    saved the first time we receive an event for this issue.
+    """
     fingerprint = models.CharField(max_length=255, unique=True)
     last_seen = models.DateTimeField(null=True, default=None)
     module = models.CharField(max_length=255, default='')
@@ -27,6 +34,7 @@ class Issue(models.Model):
 
 
 class UserIssue(models.Model):
+    """Stores when a user was last notified about an issue."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     last_notified = models.DateTimeField(null=True, default=None)
@@ -36,11 +44,16 @@ class UserIssue(models.Model):
 
 
 class TriggerRun(models.Model):
+    """
+    Stores when the last successfully-finished evaluation of alert
+    triggers was.
+    """
     ran_at = models.DateTimeField()
     finished = models.BooleanField(default=False)
 
 
 class HyperLogLogField(models.Field):
+    """Custom database field for a postgresql-hll column."""
     def __init__(self, *args, **kwargs):
         kwargs['default'] = self.default_value
         super().__init__(*args, **kwargs)
@@ -51,6 +64,10 @@ class HyperLogLogField(models.Field):
         return name, path, args, kwargs
 
     def default_value(self):
+        """
+        The default value is a blob of binary data from the hll_empty()
+        Postgres function.
+        """
         with connection.cursor() as cursor:
             cursor.execute('SELECT hll_empty()')
             return cursor.fetchone()[0]
@@ -61,7 +78,20 @@ class HyperLogLogField(models.Field):
 
 class IssueBucketManager(models.Manager):
     def event_count(self, issue=None, start_date=None, end_date=None):
+        """
+        Count the total number of unique events seen, filtered by the
+        given parameters.
+
+        :param Issue issue:
+            Only count events for this issue, if given.
+        :param datetime.date start_date:
+            Only count events occurring on or after this date, if given.
+        :param datetime.date end_date:
+            Only count events occurring on or before this date, if
+            given.
+        """
         with connection.cursor() as cursor:
+            # We need raw SQL to call the postgresql-hll functions
             query = '''
                 SELECT
                     hll_cardinality(hll_union_agg(count_set))
@@ -89,7 +119,19 @@ class IssueBucketManager(models.Manager):
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
-    def top_issues(self, start_date=None, end_date=None, limit=10):
+    def top_issue_counts(self, start_date=None, end_date=None, limit=10):
+        """
+        Return a list of tuples of (event_count, Issue), ordered by
+        their event count over the requested period in descending order.
+
+        :param datetime.date start_date:
+            Only count events occurring on or after this date, if given.
+        :param datetime.date end_date:
+            Only count events occurring on or before this date, if
+            given.
+        :param limit:
+            Limit the amount of top issues returned.
+        """
         with connection.cursor() as cursor:
             where_clauses = []
             params = {'limit': limit}
@@ -127,6 +169,7 @@ class IssueBucketManager(models.Manager):
 
 
 class IssueBucket(models.Model):
+    """Bucket for storing event counts per-issue, bucketed per-day."""
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     date = models.DateField(default=timezone.now)
     count_set = HyperLogLogField()

@@ -9,11 +9,21 @@ from botocore.exceptions import ClientError
 
 
 class AlertBackend:
+    """Base class for backends that output alerts."""
     def send_alert(self, to, subject, body):
+        """
+        :param to:
+            Email address of user to send alert to.
+        :param subject:
+            Subject line for alert notification.
+        :param body:
+            Main body text of alert notification.
+        """
         raise NotImplementedError()
 
 
 class ConsoleAlertBackend(AlertBackend):
+    """Outputs alert contents to stdout."""
     def send_alert(self, to, subject, body):
         print(f'== Sending Alert')
         print(f'   To: {to}')
@@ -24,6 +34,7 @@ class ConsoleAlertBackend(AlertBackend):
 
 
 class EmailAlertBackend(AlertBackend):
+    """Sends alert emails via Amazon SES."""
     def __init__(
         self,
         from_email,

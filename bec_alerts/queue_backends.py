@@ -10,11 +10,21 @@ from botocore.exceptions import ClientError
 
 
 class QueueBackend:
+    """
+    Base class for backends that listen for incoming Sentry events.
+    """
     def receive_events(self):
+        """
+        :returns:
+            An iterator filled with Sentry events. It may potentially
+            be empty if no new events are available, and may block while
+            it polls for new events.
+        """
         raise NotImplementedError()
 
 
 class SQSQueueBackend(QueueBackend):
+    """Listen for incoming events from an Amazon SQS queue."""
     def __init__(
         self,
         queue_name,
