@@ -91,6 +91,14 @@ logged to the console if any alerts were triggered. It may be useful to set the
 `enabled` property on the example triggers in `bec_alerts/triggers.py`, which
 will trigger alerts whenever a new event is seen or when new events that the user has not seen before are seen.
 
+### Running Tests
+
+You can run the test suite using pytest in the processor container:
+
+```sh
+docker-compose run processor pytest /app
+```
+
 ## Deployment
 
 The service consists of a few AWS services and a Docker image that is intended to be run on EC2. The required AWS resources are:

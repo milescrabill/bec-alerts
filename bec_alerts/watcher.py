@@ -11,7 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from bec_alerts.alert_backends import ConsoleAlertBackend, EmailAlertBackend
-from bec_alerts.errors import captureException, initialize_error_reporting
+from bec_alerts.errors import capture_exception, initialize_error_reporting
 from bec_alerts.models import Issue, TriggerRun
 from bec_alerts.triggers import get_trigger_classes
 from bec_alerts.utils import latest_nightly_appbuildid
@@ -67,7 +67,7 @@ class TriggerEvaluator:
                 try:
                     trigger.evaluate(issue)
                 except Exception:
-                    captureException(
+                    capture_exception(
                         f'Error while running trigger {trigger.__name__} against issue '
                         f'{issue.fingerprint}'
                     )
@@ -165,7 +165,7 @@ def main(
             )
     except Exception:
         # Just make sure Sentry knows that we failed on startup
-        captureException('Failed during watcher startup')
+        capture_exception('Failed during watcher startup')
         raise
 
     while True:
@@ -173,7 +173,7 @@ def main(
             evaluator = TriggerEvaluator(alert_backend, dry_run)
             evaluator.run_job()
         except Exception as err:
-            captureException(f'Error evaluating triggers')
+            capture_exception('Error evaluating triggers')
         finally:
             if datadog_api_key:
                 datadog.statsd.increment(datadog_counter_name)

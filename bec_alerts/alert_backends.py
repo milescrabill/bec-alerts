@@ -7,6 +7,8 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
+from bec_alerts.errors import capture_exception
+
 
 class AlertBackend:
     """Base class for backends that output alerts."""
@@ -75,4 +77,4 @@ class EmailAlertBackend(AlertBackend):
                 Source=self.from_email
             )
         except ClientError as err:
-            print(f'Could not send email: {err.response["Error"]["Message"]}')
+            capture_exception(f'Could not send email: {err.response["Error"]["Message"]}')

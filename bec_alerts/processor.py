@@ -12,7 +12,7 @@ import click
 from django.utils import timezone
 from django.utils.functional import cached_property
 
-from bec_alerts.errors import captureException, initialize_error_reporting
+from bec_alerts.errors import capture_exception, initialize_error_reporting
 from bec_alerts.models import Issue, IssueBucket
 from bec_alerts.queue_backends import SQSQueueBackend
 
@@ -108,28 +108,15 @@ def process_event(event):
 
 def listen(
     sleep_delay,
-    queue_name,
-    endpoint_url,
-    connect_timeout,
-    read_timeout,
+    queue_backend,
     worker_message_count,
-    sentry_dsn,
 ):
     """
     Listen for incoming events and process them.
 
     This is the entrypoint for worker processes.
     """
-    initialize_error_reporting(sentry_dsn)
     logger = logging.getLogger('bec-alerts.processor.worker')
-
-    queue_backend = SQSQueueBackend(
-        queue_name=queue_name,
-        endpoint_url=endpoint_url,
-        connect_timeout=connect_timeout,
-        read_timeout=read_timeout,
-    )
-
     logger.info('Waiting for an event')
 
     # Exit after worker_message_count events have been processed.
@@ -146,9 +133,9 @@ def listen(
                     process_event(event)
                     messages_processed += 1
                 except Exception as err:
-                    captureException(f'Error processing event: {event.id}')
+                    capture_exception(f'Error processing event: {event.id}')
         except Exception as err:
-            captureException(f'Error receiving message: {err}')
+            capture_exception('Error receiving message')
 
 
 @click.command()
@@ -211,16 +198,23 @@ def main(
     logger = logging.getLogger('bec-alerts.processor')
     worker_ids = itertools.count()
 
+    try:
+        queue_backend = SQSQueueBackend(
+            queue_name=queue_name,
+            endpoint_url=endpoint_url,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+        )
+    except Exception:
+        capture_exception('Error initializing queue backend, will exit.')
+        return
+
     logger.info('Starting processor workers')
     processes = []
     listen_kwargs = {
         'sleep_delay': sleep_delay,
-        'queue_name': queue_name,
-        'endpoint_url': endpoint_url,
-        'connect_timeout': connect_timeout,
-        'read_timeout': read_timeout,
+        'queue_backend': queue_backend,
         'worker_message_count': worker_message_count,
-        'sentry_dsn': sentry_dsn,
     }
     for k in range(process_count):
         process = Process(target=listen, kwargs=listen_kwargs)
@@ -245,4 +239,4 @@ def main(
             if process.is_alive():
                 process.terminate()
     except Exception:
-        captureException()
+        capture_exception()
