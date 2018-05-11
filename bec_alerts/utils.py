@@ -1,9 +1,11 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+from datetime import datetime
 from functools import lru_cache
 
 import requests
+from django.utils import timezone
 
 
 @lru_cache(maxsize=2)
@@ -45,3 +47,8 @@ def latest_nightly_appbuildid():
 
     response_data = response.json()
     return response_data['aggregations']['build_ids']['buckets'][0]['key']
+
+
+def aware_datetime(*args, **kwargs):
+    new_date = datetime(*args, **kwargs)
+    return timezone.make_aware(new_date, timezone=timezone.utc)

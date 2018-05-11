@@ -63,6 +63,10 @@ class TriggerEvaluator:
         for trigger_class in get_trigger_classes():
             trigger = trigger_class(self.alert_backend, self.dry_run, self.now)
             for issue in issues:
+                self.logger.debug(
+                    f'Evaluting {trigger_class.__name__} against issue {issue.fingerprint}.'
+                )
+
                 # Don't let a single failure block all trigger evaluations
                 try:
                     trigger.evaluate(issue)

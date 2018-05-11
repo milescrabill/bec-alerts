@@ -11,11 +11,7 @@ from django.utils import timezone
 from bec_alerts.processor import listen
 from bec_alerts.models import Issue, IssueBucket
 from bec_alerts.queue_backends import StaticQueueBackend
-
-
-def aware_datetime(*args, **kwargs):
-    new_date = datetime(*args, **kwargs)
-    return timezone.make_aware(new_date, timezone=timezone.utc)
+from bec_alerts.utils import aware_datetime
 
 
 def stack_frame(**kwargs):
