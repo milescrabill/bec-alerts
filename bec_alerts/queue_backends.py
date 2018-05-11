@@ -25,14 +25,15 @@ class QueueBackend:
 
 
 class StaticQueueBackend(QueueBackend):
-    """Returns a static list of events once, and nothing afterwards."""
-    def __init__(self, events):
-        self.events = events
+    """Returns a static list of events, and nothing afterwards."""
+    def __init__(self, event_lists):
+        self.event_lists = event_lists
 
     def receive_events(self):
-        events = self.events
-        self.events = []
-        return events
+        if self.event_lists:
+            return self.event_lists.pop(0)
+
+        return []
 
 
 class SQSQueueBackend(QueueBackend):
