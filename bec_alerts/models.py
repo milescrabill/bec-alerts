@@ -32,6 +32,13 @@ class Issue(models.Model):
     message = models.CharField(max_length=255, default='')
     groupId = models.CharField(max_length=255, default='')
 
+    def count_event(self, event_id, date):
+        bucket, created = IssueBucket.objects.get_or_create(
+            issue=self,
+            date=date,
+        )
+        bucket.count_event(event_id)
+
 
 class UserIssue(models.Model):
     """Stores when a user was last notified about an issue."""
@@ -117,7 +124,7 @@ class IssueBucketManager(models.Manager):
                 query += f'WHERE {" AND ".join(where_clauses)}'
 
             cursor.execute(query, params)
-            return cursor.fetchone()[0]
+            return cursor.fetchone()[0] or 0
 
     def top_issue_counts(self, start_date=None, end_date=None, limit=10):
         """

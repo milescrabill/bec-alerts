@@ -56,3 +56,28 @@ def test_evaluator_always(reraise_errors, set_trigger_classes):
 
     user = User.objects.get(email='test@example.com')
     assert user.has_been_notified_about(issue)
+
+    # If we run again, the issue will not be re-evaluated
+    evaluator.run_job()
+    assert len(alert_backend.alerts) == 1
+
+
+@pytest.mark.django_db
+def test_evaluator_dry_run(reraise_errors, set_trigger_classes):
+    alert_backend = CollectingAlertBackend()
+    evaluator = TriggerEvaluator(alert_backend, dry_run=True)
+    set_trigger_classes([AlwaysNotifyTrigger])
+
+    issue = IssueFactory.create(message='AlwaysTest')
+    evaluator.run_job()
+
+    assert len(alert_backend.alerts) == 1
+
+    # Dry runs do not store that a user was notified
+    user = User.objects.get(email='test@example.com')
+    assert not user.has_been_notified_about(issue)
+
+    # If we run again, the issue will be re-evaluated since it was a dry
+    # run
+    evaluator.run_job()
+    assert len(alert_backend.alerts) == 2

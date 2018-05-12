@@ -99,11 +99,7 @@ def process_event(event):
         issue.save()
 
     # Increment the event count bucket
-    bucket, created = IssueBucket.objects.get_or_create(
-        issue=issue,
-        date=event.datetime_received.date(),
-    )
-    bucket.count_event(event.id)
+    issue.count_event(event_id=event.id, date=event.datetime_received.date())
 
 
 def listen(
